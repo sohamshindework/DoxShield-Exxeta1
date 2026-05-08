@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# build artifacts
+dist/
+out/
+*.dmg
+*.zip
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Electron
+*.log
