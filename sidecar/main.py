@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 DATA_DIR = Path(os.path.expanduser("~/.doxshield"))
 LAST_SCAN_FILE = DATA_DIR / "last_scan.json"

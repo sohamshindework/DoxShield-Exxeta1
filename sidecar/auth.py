@@ -2,8 +2,6 @@
 import os
 import secrets
 import time
-from datetime import datetime, timedelta
-from pathlib import Path
 
 import jwt
 from fastapi import APIRouter, HTTPException
@@ -19,9 +17,14 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # In-memory OTP store: email → {code, expires_at, name, user_type}
 _otp_store: dict[str, dict] = {}
 
-JWT_SECRET = os.getenv("JWT_SECRET", "")
+JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 30
+
+
+def _require_jwt_secret() -> None:
+    if len(JWT_SECRET) < 32 or JWT_SECRET == "doxshield-default-secret-change-in-production":
+        raise HTTPException(503, "OTP login requires a unique JWT_SECRET of at least 32 characters")
 
 
 class SendOTPRequest(BaseModel):
@@ -47,9 +50,7 @@ def _send_otp_email(email: str, name: str, code: str) -> tuple[bool, str]:
     """Send OTP via Resend. Returns (success, error_msg)."""
     api_key = os.getenv("RESEND_API_KEY", "")
     if not api_key:
-        # Dev mode: just print the code
-        print(f"[Auth] OTP for {email}: {code} (RESEND_API_KEY not set)")
-        return True, ""
+        return False, "OTP email is unavailable: configure RESEND_API_KEY"
 
     if resend_lib is None:
         return False, "resend package not installed"
@@ -97,15 +98,14 @@ def _send_otp_email(email: str, name: str, code: str) -> tuple[bool, str]:
 """,
         })
         return True, ""
-    except Exception as e:
-        # Resend failed (e.g. invalid/test API key) — fall back to terminal logging
-        # so the dev flow still works
-        print(f"[Auth] OTP for {email}: {code} (Resend error: {e})")
-        return True, ""
+    except Exception:
+        # Provider exceptions may contain request data. Never log them or OTPs.
+        return False, "OTP email delivery failed"
 
 
 @router.post("/send-otp")
 async def send_otp(req: SendOTPRequest):
+    _require_jwt_secret()
     code = _generate_otp()
     _otp_store[req.email] = {
         "code": code,
@@ -116,12 +116,14 @@ async def send_otp(req: SendOTPRequest):
 
     ok, err = _send_otp_email(req.email, req.name, code)
     if not ok:
+        _otp_store.pop(req.email, None)
         return {"success": False, "error": err}
     return {"success": True, "message": "Code sent"}
 
 
 @router.post("/verify-otp")
 async def verify_otp(req: VerifyOTPRequest):
+    _require_jwt_secret()
     entry = _otp_store.get(req.email)
     if not entry:
         raise HTTPException(400, "No OTP sent to this email")
@@ -152,6 +154,7 @@ async def verify_otp(req: VerifyOTPRequest):
 
 @router.post("/verify-token")
 async def verify_token(req: VerifyTokenRequest):
+    _require_jwt_secret()
     try:
         payload = jwt.decode(req.token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user = {

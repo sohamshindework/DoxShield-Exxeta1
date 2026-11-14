@@ -35,6 +35,8 @@ def _was_recently_alerted(app_name: str, risk_level: str) -> bool:
     history = _load_history()
     cutoff = datetime.now().timestamp() - DEDUP_HOURS * 3600
     for entry in history:
+        if entry.get("skipped"):
+            continue
         if (entry.get("app_name") == app_name and
                 entry.get("risk_level") == risk_level):
             try:
@@ -73,7 +75,7 @@ async def send_risk_alert(
             "sent_at": datetime.now().isoformat(), "destination_country": destination_country,
             "domains": destination_domains, "skipped": True, "reason": "no_api_key",
         })
-        return True
+        return False
 
     if resend_lib is None:
         print("[Alerts] resend package not installed")
@@ -154,8 +156,8 @@ async def send_risk_alert(
             "destination_country": destination_country, "domains": destination_domains,
         })
         return True
-    except Exception as e:
-        print(f"[Alerts] Resend error: {e}")
+    except Exception:
+        print("[Alerts] Email delivery failed")
         return False
 
 

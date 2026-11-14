@@ -80,7 +80,7 @@ fi
 ok "Node: $(node --version)"
 
 step "Installing npm dependencies"
-npm install --silent
+npm ci --silent
 ok "npm dependencies installed"
 
 # ─── 6. Environment file ─────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ step "Checking .env"
 if [[ ! -f ".env" ]]; then
   cp .env.example .env
   ok "Created .env from .env.example"
-  warn "Edit .env to add your CLERK_PUBLISHABLE_KEY and RESEND_API_KEY"
+  warn "Edit .env: JWT_SECRET and RESEND_API_KEY enable OTP login; skip onboarding for local scanning"
 else
   ok ".env already exists"
 fi
