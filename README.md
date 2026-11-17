@@ -30,7 +30,7 @@ npm ci
 cp .env.example .env
 ```
 
-The `main` branch contains the cleaned application history through M4. The legacy `local-main` branch is outside this cleaned lineage; use `main` for development and do not merge the legacy history into it.
+The `main` branch contains the cleaned application history through M4. The legacy `local-main` branch was removed after confirmation that the exposed key was revoked. Use `main` for development and do not merge old clones' legacy history into it.
 
 Alternatively, `./setup.sh` installs/checks Homebrew, Python, Node and Ollama, pulls Mistral, creates the virtual environment and installs dependencies. Review it first: it can install system tools. The manual steps give control over those installations. Python dependencies currently have minimum versions rather than a lockfile.
 
