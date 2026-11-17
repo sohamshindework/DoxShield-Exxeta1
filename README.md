@@ -22,15 +22,15 @@ Stack: Electron, React, TypeScript, Vite, Tailwind, Zustand, FastAPI, Pydantic, 
 Use macOS, Node.js 18+ with npm, Python 3.11+ and, for policy analysis, Ollama with the Mistral model. Native scanners need macOS utilities and permissions. Model downloads need several GB of disk space.
 
 ```bash
-# From the local sanitized checkout supplied with this cleanup:
-cd DoxShield-sanitized
+git clone https://github.com/sohamshindework/DoxShield-Exxeta1.git
+cd DoxShield-Exxeta1
 python3 -m venv sidecar/.venv
 sidecar/.venv/bin/python -m pip install -r sidecar/requirements.txt
 npm ci
 cp .env.example .env
 ```
 
-The public remote still has a license-only `main`; `local-main` retains exposed history. Clone instructions will be updated after approved publication.
+The `main` branch contains the cleaned application history through M4. The legacy `local-main` branch is outside this cleaned lineage; use `main` for development and do not merge the legacy history into it.
 
 Alternatively, `./setup.sh` installs/checks Homebrew, Python, Node and Ollama, pulls Mistral, creates the virtual environment and installs dependencies. Review it first: it can install system tools. The manual steps give control over those installations. Python dependencies currently have minimum versions rather than a lockfile.
 
