@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "com.google.Chrome": ["Camera", "Microphone", "Location"],
+    "com.apple.mail": ["Contacts"],
+    "com.example.weather": ["Location", "Camera"]
+  },
+  "fda_available": true,
+  "error": null,
+  "synthetic": true
+}

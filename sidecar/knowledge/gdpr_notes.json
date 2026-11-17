@@ -1,0 +1,26 @@
+[
+  {
+    "id": "chapter-v-overview",
+    "topic": "International transfers (GDPR Chapter V)",
+    "text": "Transfers of personal data to a third country are allowed only on a lawful basis: an adequacy decision (Art. 45), appropriate safeguards such as standard contractual clauses (Art. 46), or a specific derogation (Art. 49). This is a reference summary for DPO review, not legal advice.",
+    "articles": ["44", "45", "46", "49"],
+    "source": "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+    "retrieved": "2026-11-16"
+  },
+  {
+    "id": "adequacy-decisions",
+    "topic": "Adequacy decisions",
+    "text": "The European Commission can decide that a third country ensures an adequate level of data protection, allowing transfers without further safeguards. The set of adequate countries changes over time; always check the current list.",
+    "articles": ["45"],
+    "source": "https://commission.europa.eu/law/law-topic/data-protection/international-dimension-data-protection/adequacy-decisions_en",
+    "retrieved": "2026-11-16"
+  },
+  {
+    "id": "trackers-and-cookies",
+    "topic": "Trackers and cookies",
+    "text": "Third-party trackers and cookies may transfer identifiers and behavioural data to their operators. Consent and transparency obligations can apply. This is a reference note for review, not a compliance determination.",
+    "articles": ["6", "7"],
+    "source": "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+    "retrieved": "2026-11-16"
+  }
+]

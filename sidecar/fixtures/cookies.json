@@ -1,0 +1,23 @@
+{
+  "fda_granted": true,
+  "browsers_found": ["Google Chrome", "Safari"],
+  "cookies": [
+    {
+      "id": "c1", "domain": ".google-analytics.com", "name": "_ga", "browser": "Google Chrome",
+      "is_third_party": true, "jurisdiction": "US", "risk_level": "HIGH",
+      "is_known_tracker": true, "tracker_category": "analytics", "synthetic": true
+    },
+    {
+      "id": "c2", "domain": ".eu-shop.example", "name": "session", "browser": "Safari",
+      "is_third_party": false, "jurisdiction": "EU", "risk_level": "LOW",
+      "is_known_tracker": false, "tracker_category": null, "synthetic": true
+    },
+    {
+      "id": "c3", "domain": ".doubleclick.net", "name": "IDE", "browser": "Google Chrome",
+      "is_third_party": true, "jurisdiction": "US", "risk_level": "HIGH",
+      "is_known_tracker": true, "tracker_category": "advertising", "synthetic": true
+    }
+  ],
+  "stats": {"total": 3, "third_party": 2, "cross_border": 2, "eu_only": 1, "high_risk": 2},
+  "synthetic": true
+}

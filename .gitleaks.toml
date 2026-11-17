@@ -1,0 +1,14 @@
+# gitleaks configuration for DoxShield.
+# Keeps all built-in rules; only allowlists the placeholder example config so it
+# does not produce false positives. Never add real secrets to the allowlist.
+
+title = "DoxShield gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder-only example configuration"
+paths = [
+  '''\.env\.example$''',
+]

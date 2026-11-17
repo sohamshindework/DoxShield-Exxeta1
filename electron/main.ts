@@ -1,7 +1,8 @@
-import { app, BrowserWindow, Tray, Menu, shell, ipcMain, Notification, nativeImage, safeStorage, dialog } from 'electron'
+import { app, BrowserWindow, Tray, Menu, shell, ipcMain, Notification, nativeImage, safeStorage, dialog, session } from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import { existsSync, writeFileSync, readFileSync, unlinkSync } from 'fs'
-import { startSidecar, stopSidecar, getSidecarStatus } from './sidecar'
+import { startSidecar, stopSidecar, getSidecarStatus, getSidecarClientToken, getSidecarPort } from './sidecar'
 import os from 'os'
 
 // Set app name BEFORE ready — fixes macOS menu bar name
@@ -21,6 +22,18 @@ function createTrayIcon(size: number): Electron.NativeImage {
   </svg>`
   const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
   return nativeImage.createFromDataURL(dataUrl)
+}
+
+// ─── App-origin checks ────────────────────────────────────────────────────────
+// The app's own renderer: the dev server in development, the bundled files otherwise.
+function isAppUrl(url: string): boolean {
+  const dev = process.env['ELECTRON_RENDERER_URL']
+  if (dev) return url.startsWith(dev)
+  return url.startsWith(pathToFileURL(join(__dirname, '../renderer/')).href)
+}
+
+function isWebUrl(url: string): boolean {
+  return url.startsWith('https://') || url.startsWith('http://')
 }
 
 // ─── Window ───────────────────────────────────────────────────────────────────
@@ -55,8 +68,19 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    if (isWebUrl(details.url)) shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // Never let the app window leave the app: a remote page in this window would
+  // otherwise receive the sidecar client token on its requests.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isAppUrl(url)) return
+    event.preventDefault()
+    if (isWebUrl(url)) shell.openExternal(url)
+  })
+  mainWindow.webContents.on('will-redirect', (event, url) => {
+    if (!isAppUrl(url)) event.preventDefault()
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -172,7 +196,7 @@ function setupIPC(): void {
     const pdfBuffer = await pdfWin.webContents.printToPDF({
       printBackground: true,
       pageSize: 'A4',
-      margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
     })
     pdfWin.close()
     writeFileSync(filePath, pdfBuffer)
@@ -191,6 +215,20 @@ app.whenReady().then(async () => {
   })
 
   setupIPC()
+
+  // Attach the per-launch client token only to sidecar requests made by the app
+  // window's own pages. Anything else (other windows, non-app pages) gets no token,
+  // and any client-supplied value is removed.
+  const sidecarUrls = [`http://127.0.0.1:${getSidecarPort()}/*`, `http://localhost:${getSidecarPort()}/*`]
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: sidecarUrls }, (details, callback) => {
+    const headers = { ...details.requestHeaders }
+    for (const k of Object.keys(headers)) if (k.toLowerCase() === 'x-doxshield-client') delete headers[k]
+    const pageUrl = details.frame?.url || details.webContents?.getURL() || ''
+    const fromApp = !!mainWindow && !mainWindow.isDestroyed()
+      && details.webContentsId === mainWindow.webContents.id && isAppUrl(pageUrl)
+    if (fromApp) headers['X-DoxShield-Client'] = getSidecarClientToken()
+    callback({ requestHeaders: headers })
+  })
 
   try {
     await startSidecar()

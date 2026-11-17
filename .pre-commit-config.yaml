@@ -1,0 +1,9 @@
+# Local secret-scanning hook. Enable once with:
+#   pip install pre-commit && pre-commit install
+# Developers without the pre-commit framework can instead run:
+#   bash scripts/install-hooks.sh
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

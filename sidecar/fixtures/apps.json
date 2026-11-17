@@ -1,0 +1,43 @@
+[
+  {
+    "id": "app-chrome",
+    "name": "Google Chrome",
+    "bundle_id": "com.google.Chrome",
+    "version": "120.0",
+    "category": "Browser",
+    "path": "/Applications/Google Chrome.app",
+    "developer": "Google LLC",
+    "jurisdiction": "US",
+    "risk_level": "HIGH",
+    "in_tools_db": true,
+    "tools_db_entry": {
+      "mac_process_names": ["Google Chrome"],
+      "privacy_policy_url": "https://policies.google.com/privacy"
+    },
+    "synthetic": true
+  },
+  {
+    "id": "app-mail",
+    "name": "Mail",
+    "bundle_id": "com.apple.mail",
+    "version": "16.0",
+    "category": "Mail",
+    "path": "/Applications/Mail.app",
+    "developer": "Apple Inc.",
+    "jurisdiction": "US",
+    "risk_level": "LOW",
+    "synthetic": true
+  },
+  {
+    "id": "app-weather",
+    "name": "WeatherApp",
+    "bundle_id": "com.example.weather",
+    "version": "2.3",
+    "category": "Utilities",
+    "path": "/Applications/WeatherApp.app",
+    "developer": "Example GmbH",
+    "jurisdiction": "EU",
+    "risk_level": "MEDIUM",
+    "synthetic": true
+  }
+]

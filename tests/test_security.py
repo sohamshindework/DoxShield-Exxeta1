@@ -4,17 +4,17 @@ import contextlib
 import importlib
 import io
 import os
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'sidecar'))
 import auth
 from alerts import resend_client
-from fastapi.testclient import TestClient
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 class SecurityTests(unittest.TestCase):
@@ -74,7 +74,9 @@ class SecurityTests(unittest.TestCase):
     def test_main_import_and_health_without_credentials(self):
         # Do not enter lifespan: it would start scans on the developer's device.
         main = importlib.import_module('main')
-        self.assertEqual(TestClient(main.app).get('/health').json()['status'], 'ok')
+        # The sidecar is served on 127.0.0.1; other Host names are refused (DNS rebinding).
+        client = TestClient(main.app, base_url='http://127.0.0.1:8765')
+        self.assertEqual(client.get('/health').json()['status'], 'ok')
 
 
 if __name__ == '__main__':

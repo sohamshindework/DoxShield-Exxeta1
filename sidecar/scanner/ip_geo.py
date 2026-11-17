@@ -1,12 +1,15 @@
-"""IP geolocation module — uses ip-api.com with local caching and known IP ranges fallback."""
+"""Offline IP geolocation.
+
+Privacy rule: no observed IP address ever leaves the machine. Lookups use only
+local data — private/loopback detection and the bundled known-provider ranges
+(``data/ip_ranges.json``). Addresses not covered are reported as Unknown rather
+than sent to any third-party geolocation service.
+"""
 import fnmatch
 import ipaddress
 import json
 import time
 from pathlib import Path
-from typing import Optional
-
-import httpx
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 
@@ -40,7 +43,7 @@ _cache: dict[str, tuple[dict, float]] = {}
 CACHE_TTL = 3600  # 1 hour
 
 
-def check_known_ranges(ip: str) -> Optional[dict]:
+def check_known_ranges(ip: str) -> dict | None:
     """Check if IP falls within known cloud provider ranges."""
     try:
         ip_obj = ipaddress.ip_address(ip)
@@ -96,34 +99,15 @@ async def geolocate_ip(ip: str) -> dict:
         _cache[ip] = (known, time.time())
         return known
 
-    # ip-api.com (free, 45 req/min)
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(
-                f"http://ip-api.com/json/{ip}?fields=country,countryCode,org,as,status"
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("status") == "success":
-                    country_code = data.get("countryCode", "")
-                    result = {
-                        "country": data.get("country", "Unknown"),
-                        "country_code": country_code,
-                        "org": data.get("org", data.get("as", "Unknown")),
-                        "jurisdiction": _map_jurisdiction(country_code),
-                        "source": "ip-api",
-                    }
-                    _cache[ip] = (result, time.time())
-                    return result
-    except Exception:
-        pass
-
+    # No online lookup: an address we cannot resolve offline stays Unknown.
+    # This is deliberate — sending the IP to a remote service would leak the
+    # very network flow DoxShield is here to protect.
     result = {
         "country": "Unknown",
         "country_code": "XX",
         "org": "Unknown",
         "jurisdiction": "Unknown",
-        "source": "fallback",
+        "source": "offline-unknown",
     }
     _cache[ip] = (result, time.time())
     return result
@@ -150,7 +134,7 @@ def _map_jurisdiction(country_code: str) -> str:
     return "Other"
 
 
-def check_domain_tracker(domain: str) -> Optional[dict]:
+def check_domain_tracker(domain: str) -> dict | None:
     """Check if a domain matches a known tracker pattern."""
     domain = domain.lstrip(".")
     for tracker in _tracker_domains:

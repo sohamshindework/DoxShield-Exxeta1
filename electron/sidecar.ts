@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process'
+import { randomBytes } from 'crypto'
 import { existsSync } from 'fs'
 import { join } from 'path'
 
@@ -6,6 +7,19 @@ let sidecarProcess: ChildProcess | null = null
 let sidecarStatus: 'starting' | 'ready' | 'error' = 'starting'
 
 const SIDECAR_PORT = process.env.SIDECAR_PORT || '8765'
+
+// Per-launch secret. The packaged renderer runs from file:// (Origin "null"),
+// which websites can imitate; the sidecar only accepts such requests when they
+// carry this token (see sidecar/request_guard.py). Never logged or persisted.
+const CLIENT_TOKEN = randomBytes(32).toString('hex')
+
+export function getSidecarClientToken(): string {
+  return CLIENT_TOKEN
+}
+
+export function getSidecarPort(): string {
+  return SIDECAR_PORT
+}
 const HEALTH_INTERVAL = 500
 const HEALTH_TIMEOUT = 30000
 
@@ -68,7 +82,7 @@ export async function startSidecar(): Promise<void> {
   console.log(`[Sidecar] Starting: ${python} ${main}`)
 
   sidecarProcess = spawn(python, [main], {
-    env: { ...process.env, PORT: SIDECAR_PORT, SIDECAR_PORT },
+    env: { ...process.env, PORT: SIDECAR_PORT, SIDECAR_PORT, DOXSHIELD_CLIENT_TOKEN: CLIENT_TOKEN },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Shield, Activity, Cookie, AppWindow, Bell, Settings } from 'lucide-react'
+import { Shield, Activity, Cookie, AppWindow, Bell, Settings, SearchCheck } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { cn } from '../../lib/utils'
 
@@ -9,6 +9,7 @@ const NAV = [
   { id: 'cookies',   label: 'Cookies & Trackers', icon: Cookie },
   { id: 'apps',      label: 'Applications',       icon: AppWindow },
   { id: 'alerts',    label: 'Alerts',             icon: Bell },
+  { id: 'investigations', label: 'Investigations', icon: SearchCheck },
 ]
 
 function NavItem({ id, label, icon: Icon, active, onClick, badge }: {

@@ -1,0 +1,50 @@
+[
+  {
+    "category": "Browser",
+    "name": "Mozilla Firefox",
+    "vendor": "Mozilla Foundation",
+    "country": "US",
+    "note": "Open source; strong privacy controls, though the vendor is US-based.",
+    "url": "https://www.mozilla.org/firefox/",
+    "source": "https://www.mozilla.org/firefox/",
+    "retrieved": "2026-11-16"
+  },
+  {
+    "category": "Browser",
+    "name": "Vivaldi",
+    "vendor": "Vivaldi Technologies",
+    "country": "NO",
+    "url": "https://vivaldi.com/",
+    "source": "https://vivaldi.com/privacy/",
+    "retrieved": "2026-11-16"
+  },
+  {
+    "category": "Email",
+    "name": "Proton Mail",
+    "vendor": "Proton AG",
+    "country": "CH",
+    "note": "Switzerland has an EU adequacy decision.",
+    "url": "https://proton.me/mail",
+    "source": "https://proton.me/legal/privacy",
+    "retrieved": "2026-11-16"
+  },
+  {
+    "category": "Email",
+    "name": "Tuta",
+    "vendor": "Tuta (Tutao GmbH)",
+    "country": "DE",
+    "url": "https://tuta.com/",
+    "source": "https://tuta.com/privacy-policy",
+    "retrieved": "2026-11-16"
+  },
+  {
+    "category": "Cloud storage",
+    "name": "Nextcloud",
+    "vendor": "Nextcloud GmbH",
+    "country": "DE",
+    "note": "Self-hostable.",
+    "url": "https://nextcloud.com/",
+    "source": "https://nextcloud.com/privacy/",
+    "retrieved": "2026-11-16"
+  }
+]

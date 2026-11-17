@@ -12,6 +12,7 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from request_guard import CORS_ORIGIN_REGEX, guard_middleware
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -49,25 +50,33 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Doxshield Sidecar", version="1.0.0", lifespan=lifespan)
 
+# Only local renderers may call the sidecar (see request_guard.py). The guard is
+# added last, so it runs first and refuses foreign requests before any handler.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
-    allow_credentials=True,
+    allow_origin_regex=CORS_ORIGIN_REGEX,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(guard_middleware)
 
-# ─── Auth router ──────────────────────────────────────────────────────────────
+# ─── Routers: auth, and (M4) incidents + LangGraph investigations ─────────────
+from agent.api import router as investigations_router
 from auth import router as auth_router
+
 app.include_router(auth_router)
+app.include_router(investigations_router)
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health():
+    from scanner.backend import get_backend
+    backend = get_backend()
     return {"status": "ok", "sidecar_version": "1.0.0",
+            "backend": backend.name, "synthetic": backend.is_synthetic,
             "timestamp": datetime.utcnow().isoformat()}
 
 
@@ -78,23 +87,20 @@ async def full_scan_stream():
     async def generate():
         try:
             yield f"data: {json.dumps({'step':'apps','status':'running','detail':'Discovering installed applications...'})}\n\n"
-            from scanner.apps import scan_installed_apps
-            apps = scan_installed_apps()
+            from scanner.backend import get_backend
+            apps = get_backend().scan_apps()
             yield f"data: {json.dumps({'step':'apps','status':'complete','detail':f'Found {len(apps)} applications'})}\n\n"
 
             yield f"data: {json.dumps({'step':'permissions','status':'running','detail':'Reading TCC permission database...'})}\n\n"
-            from scanner.permissions import get_app_permissions
-            perm_data = get_app_permissions()
+            perm_data = get_backend().get_permissions()
             yield f"data: {json.dumps({'step':'permissions','status':'complete','detail':'Permission data collected'})}\n\n"
 
             yield f"data: {json.dumps({'step':'network','status':'running','detail':'Analysing active network connections...'})}\n\n"
-            from scanner.network import get_active_connections
-            connections = await get_active_connections()
+            connections = await get_backend().get_connections()
             yield f"data: {json.dumps({'step':'network','status':'complete','detail':f'Found {len(connections)} active connections'})}\n\n"
 
             yield f"data: {json.dumps({'step':'cookies','status':'running','detail':'Reading browser cookies...'})}\n\n"
-            from scanner.cookies import scan_all_cookies
-            cookie_result = scan_all_cookies()
+            cookie_result = get_backend().scan_cookies()
             cookies = cookie_result.get("cookies", [])
             yield f"data: {json.dumps({'step':'cookies','status':'complete','detail':f'Found {len(cookies)} cookies'})}\n\n"
 
@@ -105,7 +111,10 @@ async def full_scan_stream():
             yield f"data: {json.dumps({'step':'ai','status':'running','detail':'Running AI policy analysis on top apps...'})}\n\n"
             from ai.policy_analyzer import analyze_policy
             policy_analyses = {}
-            for a in apps[:3]:
+            # Synthetic (fixture) scans never fetch vendor websites or call a model.
+            if get_backend().is_synthetic:
+                yield f"data: {json.dumps({'step':'ai','status':'complete','detail':'AI policy analysis skipped for synthetic data'})}\n\n"
+            for a in ([] if get_backend().is_synthetic else apps[:3]):
                 db = a.tools_db_entry
                 if db and db.get("privacy_policy_url") and a.bundle_id:
                     yield f"data: {json.dumps({'step':'ai','status':'running','detail':f'Analysing {a.name} privacy policy...'})}\n\n"
@@ -134,6 +143,8 @@ async def full_scan_stream():
 
             scan_result = {
                 "scanned_at": datetime.utcnow().isoformat(),
+                "backend": get_backend().name,
+                "synthetic": get_backend().is_synthetic,
                 "overall": overall,
                 "apps": app_risks,
                 "connections": connections,
@@ -170,7 +181,12 @@ async def full_scan_stream():
 
 
 def _schedule_scan_alerts(app_risks: list[dict]):
-    """Fire-and-forget: send alerts for high-risk apps found in scan."""
+    """Fire-and-forget: send alerts for high-risk apps found in scan.
+
+    Never emails about synthetic (fixture) scan results."""
+    from scanner.backend import get_backend
+    if get_backend().is_synthetic:
+        return
     settings = _load_settings()
     email = settings.get("alert_email", "")
     if not email or not settings.get("email_alerts_enabled", False):
@@ -216,8 +232,8 @@ async def get_apps():
     if LAST_SCAN_FILE.exists():
         with open(LAST_SCAN_FILE) as f:
             return json.load(f).get("apps", [])
-    from scanner.apps import scan_installed_apps
-    apps = scan_installed_apps()
+    from scanner.backend import get_backend
+    apps = get_backend().scan_apps()
     return [{"app_id": a.id, "app_name": a.name, "bundle_id": a.bundle_id,
              "path": a.path, "risk_level": a.risk_level or "UNVERIFIED"} for a in apps]
 
@@ -236,6 +252,9 @@ async def get_app_detail(app_id: str):
 @app.get("/api/apps/{bundle_id}/icon")
 async def get_app_icon(bundle_id: str):
     """Extract and return app icon as base64 PNG."""
+    from scanner.backend import get_backend
+    if get_backend().is_synthetic:
+        return {"icon": None}  # fixture mode never touches real apps or Spotlight
     import base64
     import subprocess
     import tempfile
@@ -302,14 +321,14 @@ async def get_app_icon(bundle_id: str):
 
 @app.get("/api/network/live")
 async def get_live_connections():
-    from scanner.network import get_active_connections
-    return await get_active_connections()
+    from scanner.backend import get_backend
+    return await get_backend().get_connections()
 
 
 @app.get("/api/network/history")
 async def get_connection_history():
-    from scanner.network import connection_history
-    return list(connection_history)
+    from scanner.backend import get_backend
+    return get_backend().connection_history()
 
 
 @app.get("/api/network/stream")
@@ -340,9 +359,10 @@ async def network_stream():
 
 @app.get("/api/cookies/status")
 async def cookies_status():
-    from scanner.cookies import check_fda, find_browser_profiles
-    fda = check_fda()
-    profiles = find_browser_profiles()
+    from scanner.backend import get_backend
+    backend = get_backend()
+    fda = backend.check_fda()
+    profiles = backend.find_browser_profiles()
     return {"fda_granted": fda, "browsers_found": list(profiles.keys())}
 
 
@@ -351,8 +371,8 @@ async def get_cookies(
     browser: str = Query("all"),
     risk: str = Query("all"),
 ):
-    from scanner.cookies import scan_all_cookies
-    result = scan_all_cookies()
+    from scanner.backend import get_backend
+    result = get_backend().scan_cookies()
     cookies = result.get("cookies", [])
     if browser.lower() != "all":
         cookies = [c for c in cookies if c.get("browser", "").lower() == browser.lower()]
@@ -371,8 +391,8 @@ async def ai_status():
 
 @app.post("/api/ai/analyze/{app_id}")
 async def analyze_app(app_id: str):
-    from scanner.apps import scan_installed_apps
-    apps = scan_installed_apps()
+    from scanner.backend import get_backend
+    apps = get_backend().scan_apps()
     target = next((a for a in apps if a.id == app_id or a.bundle_id == app_id), None)
     if not target or not target.tools_db_entry:
         return {"error": "app_not_found_or_no_policy"}
@@ -470,35 +490,45 @@ async def save_settings(payload: dict):
 
 # ─── Background monitor ────────────────────────────────────────────────────────
 
-async def background_monitor():
-    from scanner.network import get_active_connections
-    seen_high: set[str] = set()
+async def monitor_once(seen_high: set[str]) -> None:
+    """One pass of the live monitor.
 
+    Uses the selected scanner backend, so fixture mode never scans the real
+    machine. Email alerts are only sent for real (non-synthetic) observations.
+    """
+    from scanner.backend import get_backend
+    backend = get_backend()
+    connections = await backend.get_connections()
+    settings = _load_settings()
+    email = settings.get("alert_email", "")
+    may_email = (bool(email) and settings.get("email_alerts_enabled")
+                 and settings.get("alerts_enabled") and not backend.is_synthetic)
+
+    for conn in connections:
+        key = f"{conn.get('remote_ip')}:{conn.get('remote_port')}"
+        if conn.get("risk_level") in ("HIGH", "SEVERE") and key not in seen_high:
+            seen_high.add(key)
+            await broadcast({"type": "new_high_risk_connection", "data": conn})
+
+            if may_email:
+                from alerts.resend_client import send_risk_alert
+                asyncio.create_task(send_risk_alert(
+                    to_email=email,
+                    app_name=conn.get("app_name") or conn.get("process_name", "Unknown"),
+                    risk_level=conn.get("risk_level", "HIGH"),
+                    risk_reasons=[f"Connection to {conn.get('country', 'Unknown')} detected"],
+                    destination_country=conn.get("country", "Unknown"),
+                    destination_domains=[conn.get("remote_domain") or conn.get("remote_ip", "")],
+                    legal_framework="US CLOUD Act" if conn.get("country_code") == "US" else "Unknown",
+                    recommended_actions=["Review this app's network activity"],
+                ))
+
+
+async def background_monitor():
+    seen_high: set[str] = set()
     while True:
         try:
-            connections = await get_active_connections()
-            settings = _load_settings()
-            email = settings.get("alert_email", "")
-
-            for conn in connections:
-                key = f"{conn.get('remote_ip')}:{conn.get('remote_port')}"
-                if conn.get("risk_level") in ("HIGH", "SEVERE") and key not in seen_high:
-                    seen_high.add(key)
-                    await broadcast({"type": "new_high_risk_connection", "data": conn})
-
-                    # Email alert for new high-risk connections
-                    if email and settings.get("email_alerts_enabled") and settings.get("alerts_enabled"):
-                        from alerts.resend_client import send_risk_alert
-                        asyncio.create_task(send_risk_alert(
-                            to_email=email,
-                            app_name=conn.get("app_name") or conn.get("process_name", "Unknown"),
-                            risk_level=conn.get("risk_level", "HIGH"),
-                            risk_reasons=[f"Connection to {conn.get('country', 'Unknown')} detected"],
-                            destination_country=conn.get("country", "Unknown"),
-                            destination_domains=[conn.get("remote_domain") or conn.get("remote_ip", "")],
-                            legal_framework="US CLOUD Act" if conn.get("country_code") == "US" else "Unknown",
-                            recommended_actions=["Review this app's network activity"],
-                        ))
+            await monitor_once(seen_high)
         except asyncio.CancelledError:
             break
         except Exception as e:

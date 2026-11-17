@@ -15,6 +15,7 @@ const Alerts          = lazy(() => import('../../pages/Alerts'))
 const Settings        = lazy(() => import('../../pages/Settings'))
 const AppDetail       = lazy(() => import('../../pages/AppDetail'))
 const Applications    = lazy(() => import('../../pages/Applications'))
+const Investigations  = lazy(() => import('../../pages/Investigations'))
 
 const variants   = { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -4 } }
 const transition = { duration: 0.2, ease: 'easeOut' }
@@ -38,6 +39,7 @@ function PageContent() {
       case 'cookies':     return <Cookies />
       case 'apps':        return <Applications />
       case 'alerts':      return <Alerts />
+      case 'investigations': return <Investigations />
       case 'settings':    return <Settings />
       case 'app-detail':  return <AppDetail />
       default:            return isBusiness ? <BusinessDashboard /> : <ConsumerDashboard />
